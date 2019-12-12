@@ -17,7 +17,7 @@ U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ 16, /* clock=*/
 
 u8g2_uint_t offset;     // current offset for the scrolling text
 u8g2_uint_t width;      // pixel width of the scrolling text (must be lesser than 128 unless U8G2_16BIT is defined
-const char *text = "ROB01 "; // scroll this text from right to left
+const char *text = "Ddori Gps "; // scroll this text from right to left
 
 SoftwareSerial ss(RXPin, TXPin);
 
@@ -36,12 +36,6 @@ void setup(void) {
   Serial.begin(57600);
   ss.begin(GPSBaud);
 
-  Serial.println(F("DeviceExample.ino"));
-  Serial.println(F("A simple demonstration of TinyGPS++ with an attached GPS module"));
-  Serial.print(F("Testing TinyGPS++ library v. ")); Serial.println(TinyGPSPlus::libraryVersion());
-  Serial.println(F("by Mikal Hart"));
-  Serial.println();
-
   telemetry.begin(FrSkySportSingleWireSerial::SOFT_SERIAL_PIN_12, &frGps, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
 
 }
@@ -53,12 +47,8 @@ void loop(void) {
   u8g2.setFont(u8g2_font_micro_tr);
 
   while (ss.available() > 0) {
-    u8g2.setCursor(0, 21);
     if (gps.encode(ss.read())) {
-      u8g2.print("gps ok...");
-      u8g2.setCursor(70, 21);
-      u8g2.print(gps.speed.kmph());
-      displayInfo();
+    // displayInfo();
 
     // Set GPS data
     frGps.setData(gps.location.lat(), gps.location.lng(),   // Latitude and longitude in degrees decimal (positive for N/E, negative for S/W)
@@ -67,23 +57,33 @@ void loop(void) {
               gps.course.deg(),                             // Course over ground in degrees
               gps.date.year(), gps.date.month(), gps.date.day(),             // Date (year - 2000, month, day)
               gps.time.hour(), gps.time.minute(), gps.time.second());        // Time (hour, minute, second) - will be affected by timezone setings in your radio
+
+    telemetry.send();
       
-    } else {
-      u8g2.print("gps checking...");
     }
   }
+
 
   if (millis() > 5000 && gps.charsProcessed() < 10)
   {
     Serial.println(F("No GPS detected: check wiring."));
-    while(true);
-  } else {
     do{
       u8g2.setCursor(0, 27);
-      u8g2.print("hahahaha....");
+      u8g2.print("No GPS detected: check wiring.");
     } while( u8g2.nextPage() );
-    telemetry.send();
+    while(true);
   }
+}
+
+void displayGpsSpeed() {
+  if(!gps.location.isValid()) return;
+
+  do {
+    u8g2.setCursor(0, 21);
+    u8g2.print("gps ok...");
+    u8g2.setCursor(70, 21);
+    u8g2.print(gps.speed.kmph());
+  } while( u8g2.nextPage() );
 }
 
 
