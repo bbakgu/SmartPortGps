@@ -24,6 +24,9 @@ SoftwareSerial ss(RXPin, TXPin);
 FrSkySportSensorGps frGps;                               // Create GPS sensor with default ID
 FrSkySportTelemetry telemetry;                         // Create Variometer telemetry object
 
+char recvGpsSignal = 0;
+long prevMillis = 0;
+
 
 void setup(void) {
   u8g2.begin();
@@ -48,7 +51,10 @@ void loop(void) {
 
   while (ss.available() > 0) {
     if (gps.encode(ss.read())) {
+      recvGpsSignal = 1;
+      prevMillis = millis();
     // displayInfo();
+    displayGpsSpeed();
 
     // Set GPS data
     frGps.setData(gps.location.lat(), gps.location.lng(),   // Latitude and longitude in degrees decimal (positive for N/E, negative for S/W)
@@ -62,6 +68,8 @@ void loop(void) {
       
     }
   }
+  gpsTimeoutCheck();
+  
 
 
   if (millis() > 5000 && gps.charsProcessed() < 10)
@@ -72,6 +80,13 @@ void loop(void) {
       u8g2.print("No GPS detected: check wiring.");
     } while( u8g2.nextPage() );
     while(true);
+  } else {
+    if(recvGpsSignal == 0) {
+      do {
+        u8g2.setCursor(0, 10);
+        u8g2.print("Waiting GPS.....");
+      } while( u8g2.nextPage());
+    }
   }
 }
 
@@ -84,6 +99,15 @@ void displayGpsSpeed() {
     u8g2.setCursor(70, 21);
     u8g2.print(gps.speed.kmph());
   } while( u8g2.nextPage() );
+}
+
+void gpsTimeoutCheck() {
+  if(recvGpsSignal == 0) return;
+  long now = millis();
+
+  if( (now - prevMillis) > 30000) {
+    recvGpsSignal = 0;
+  }
 }
 
 
