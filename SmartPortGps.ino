@@ -26,6 +26,7 @@ FrSkySportTelemetry telemetry;                         // Create Variometer tele
 
 char recvGpsSignal = 0;
 long prevMillis = 0;
+int maxSpeed = 0;
 
 
 void setup(void) {
@@ -43,52 +44,147 @@ void setup(void) {
 
 }
 
-
 void loop(void) {
-  
   u8g2.firstPage();
-  u8g2.setFont(u8g2_font_micro_tr);
+  u8g2.setFont(u8g2_font_5x7_tf);
+
+  u8g2.drawLine(0, 10, 132, 10);
+  u8g2.drawLine(64, 10, 64, 48);
+
+  char curTime[10];
+  char buff[8];
+  getCurTime(curTime);
 
   while (ss.available() > 0) {
     if (gps.encode(ss.read())) {
-      recvGpsSignal = 1;
-      prevMillis = millis();
-    // displayInfo();
-    displayGpsSpeed();
+      sendSmartPortData();
+      u8g2.drawUTF8(106, 8, "r");
+      setMaxSpeed();
+    }
+  }
+  
+  do {
+    u8g2.drawStr(0, 8, curTime);
+    u8g2.drawStr(0, 18, "Cur: ");
+    getStrValue(buff, gps.speed.kmph());
+    u8g2.drawStr(22, 18, buff);
+    u8g2.drawStr(44, 18, "kmph");
 
-    // Set GPS data
+    getStrValue(buff, gps.location.lat(), 8, 4);
+    u8g2.drawStr(0, 25, "LAT: ");
+    u8g2.drawStr(22, 25, buff);
+
+    getStrValue(buff, gps.location.lng(), 8, 4);
+    u8g2.drawStr(0, 32, "LNG: ");
+    u8g2.drawStr(22, 32, buff);
+
+    setMaxSpeed();
+    getStrValue(buff, maxSpeed);
+    u8g2.drawStr(66, 18, "MAX: ");
+    u8g2.drawStr(88, 18, buff);
+    u8g2.drawStr(109, 18, "kmph");
+
+    getStrValue(buff, gps.altitude.meters(), 6, 1);
+    u8g2.drawStr(66, 25, "ALT: ");
+    u8g2.drawStr(80, 25, buff);
+
+    u8g2.drawStr(48, 8, "JI-HOON");
+    
+    getStrValue(buff, gps.satellites.value());
+    u8g2.drawUTF8(112, 8, buff);
+
+    if( gps.satellites.value() > 4 ) {
+      u8g2.setFont(u8g2_font_open_iconic_all_1x_t);
+      u8g2.drawUTF8(120, 8, "\u00f8");
+    }
+  } while( u8g2.nextPage() );
+}
+
+int getLocalHour(int org, int gmt) {
+  int ret = org + gmt;
+  if(ret >= 24) ret = ret - 24;
+  return ret;
+    
+}
+
+void getStrValue(char* buff, int value) {
+  sprintf(buff, "%d", value);
+}
+
+void getStrValue(char* buff, double value, int width, int len) {
+  dtostrf(value, width, len, buff);
+}
+
+void getCurTime(char* curTime) {
+
+  sprintf(curTime, "%02d:%02d:%02d", getLocalHour(gps.time.hour(), 9), gps.time.minute(), gps.time.second());
+}
+
+void setMaxSpeed() {
+
+  if( gps.speed.kmph() > ( maxSpeed + 100) )
+    return;
+    
+  if( gps.speed.kmph() > maxSpeed)
+    maxSpeed = gps.speed.kmph();
+}
+
+void sendSmartPortData() {
     frGps.setData(gps.location.lat(), gps.location.lng(),   // Latitude and longitude in degrees decimal (positive for N/E, negative for S/W)
-              gps.altitude.meters(),                        // Altitude in m (can be nevative)
-              gps.speed.mps(),                              // Speed in m/s
-              gps.course.deg(),                             // Course over ground in degrees
-              gps.date.year(), gps.date.month(), gps.date.day(),             // Date (year - 2000, month, day)
-              gps.time.hour(), gps.time.minute(), gps.time.second());        // Time (hour, minute, second) - will be affected by timezone setings in your radio
+            gps.altitude.meters(),                        // Altitude in m (can be nevative)
+            gps.speed.mps(),                              // Speed in m/s
+            gps.course.deg(),                             // Course over ground in degrees
+            gps.date.year(), gps.date.month(), gps.date.day(),             // Date (year - 2000, month, day)
+            gps.time.hour(), gps.time.minute(), gps.time.second());        // Time (hour, minute, second) - will be affected by timezone setings in your radio
 
     telemetry.send();
-      
-    }
-  }
-  gpsTimeoutCheck();
-  
-
-
-  if (millis() > 5000 && gps.charsProcessed() < 10)
-  {
-    Serial.println(F("No GPS detected: check wiring."));
-    do{
-      u8g2.setCursor(0, 27);
-      u8g2.print("No GPS detected: check wiring.");
-    } while( u8g2.nextPage() );
-    while(true);
-  } else {
-    if(recvGpsSignal == 0) {
-      do {
-        u8g2.setCursor(0, 10);
-        u8g2.print("Waiting GPS.....");
-      } while( u8g2.nextPage());
-    }
-  }
 }
+
+//void loop(void) {
+//  
+//  u8g2.firstPage();
+//  u8g2.setFont(u8g2_font_micro_tr);
+//
+//  while (ss.available() > 0) {
+//    if (gps.encode(ss.read())) {
+//      recvGpsSignal = 1;
+//      prevMillis = millis();
+//    // displayInfo();
+//    displayGpsSpeed();
+//
+//    // Set GPS data
+//    frGps.setData(gps.location.lat(), gps.location.lng(),   // Latitude and longitude in degrees decimal (positive for N/E, negative for S/W)
+//              gps.altitude.meters(),                        // Altitude in m (can be nevative)
+//              gps.speed.mps(),                              // Speed in m/s
+//              gps.course.deg(),                             // Course over ground in degrees
+//              gps.date.year(), gps.date.month(), gps.date.day(),             // Date (year - 2000, month, day)
+//              gps.time.hour(), gps.time.minute(), gps.time.second());        // Time (hour, minute, second) - will be affected by timezone setings in your radio
+//
+//    telemetry.send();
+//      
+//    }
+//  }
+//  gpsTimeoutCheck();
+//  
+//
+//
+//  if (millis() > 5000 && gps.charsProcessed() < 10)
+//  {
+//    Serial.println(F("No GPS detected: check wiring."));
+//    do{
+//      u8g2.setCursor(0, 27);
+//      u8g2.print("No GPS detected: check wiring.");
+//    } while( u8g2.nextPage() );
+//    while(true);
+//  } else {
+//    if(recvGpsSignal == 0) {
+//      do {
+//        u8g2.setCursor(0, 10);
+//        u8g2.print("Waiting GPS.....");
+//      } while( u8g2.nextPage());
+//    }
+//  }
+//}
 
 void displayGpsSpeed() {
   if(!gps.location.isValid()) return;
