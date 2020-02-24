@@ -27,77 +27,128 @@ FrSkySportTelemetry telemetry;                         // Create Variometer tele
 char recvGpsSignal = 0;
 long prevMillis = 0;
 int maxSpeed = 0;
+boolean isMaxMode = true;
 
 
 void setup(void) {
   u8g2.begin();
 
-  u8g2.setFont(u8g2_font_logisoso32_tf); // set the target font to calculate the pixel width
-  width = u8g2.getUTF8Width(text);    // calculate the pixel width of the text
+//  u8g2.setFont(u8g2_font_logisoso32_tf); // set the target font to calculate the pixel width
+//  width = u8g2.getUTF8Width(text);    // calculate the pixel width of the text
 
   u8g2.setFontMode(0);    // enable transparent mode, which is faster
+
+  pinMode(0, INPUT);
 
   Serial.begin(57600);
   ss.begin(GPSBaud);
 
-  telemetry.begin(FrSkySportSingleWireSerial::SOFT_SERIAL_PIN_12, &frGps, NULL, NULL, NULL, NULL, NULL, NULL, NULL);
+  telemetry.begin(FrSkySportSingleWireSerial::SOFT_SERIAL_PIN_4, &frGps);
 
 }
 
 void loop(void) {
+
+  if(digitalRead(0) == 0) { 
+    isMaxMode = !isMaxMode;
+    delay(250);
+  }
+  
+  u8g2.clearBuffer();
   u8g2.firstPage();
   u8g2.setFont(u8g2_font_5x7_tf);
+  u8g2.setFontPosTop();
 
-  u8g2.drawLine(0, 10, 132, 10);
-  u8g2.drawLine(64, 10, 64, 48);
+  //u8g2_font_luBIS18_tf
+
+  u8g2.drawLine(0, 8, 128, 8);
+  u8g2.drawLine(64, 8, 64, 48);
 
   char curTime[10];
-  char buff[8];
   getCurTime(curTime);
 
   while (ss.available() > 0) {
     if (gps.encode(ss.read())) {
-      sendSmartPortData();
-      u8g2.drawUTF8(106, 8, "r");
+      u8g2.drawUTF8(103, 0, "r");
       setMaxSpeed();
     }
   }
   
   do {
-    u8g2.drawStr(0, 8, curTime);
-    u8g2.drawStr(0, 18, "Cur: ");
-    getStrValue(buff, gps.speed.kmph());
-    u8g2.drawStr(22, 18, buff);
-    u8g2.drawStr(44, 18, "kmph");
-
-    getStrValue(buff, gps.location.lat(), 8, 4);
-    u8g2.drawStr(0, 25, "LAT: ");
-    u8g2.drawStr(22, 25, buff);
-
-    getStrValue(buff, gps.location.lng(), 8, 4);
-    u8g2.drawStr(0, 32, "LNG: ");
-    u8g2.drawStr(22, 32, buff);
-
-    setMaxSpeed();
-    getStrValue(buff, maxSpeed);
-    u8g2.drawStr(66, 18, "MAX: ");
-    u8g2.drawStr(88, 18, buff);
-    u8g2.drawStr(109, 18, "kmph");
-
-    getStrValue(buff, gps.altitude.meters(), 6, 1);
-    u8g2.drawStr(66, 25, "ALT: ");
-    u8g2.drawStr(80, 25, buff);
-
-    u8g2.drawStr(48, 8, "JI-HOON");
-    
-    getStrValue(buff, gps.satellites.value());
-    u8g2.drawUTF8(112, 8, buff);
-
-    if( gps.satellites.value() > 4 ) {
-      u8g2.setFont(u8g2_font_open_iconic_all_1x_t);
-      u8g2.drawUTF8(120, 8, "\u00f8");
-    }
+    drawHeader(curTime);
+    if(isMaxMode) drawMaxMode();
+    else          drawHudMode();
+    drawAntenna();
   } while( u8g2.nextPage() );
+
+  
+
+  sendSmartPortData();
+}
+
+void drawHudMode() {
+  char buff[8];
+  
+  u8g2.drawStr(56, 9, "k");
+  u8g2.drawStr(56, 17, "/");
+  u8g2.drawStr(56, 25, "h");
+
+//  u8g2.drawStr(120, 9, "a");
+//  u8g2.drawStr(120, 17, "l");
+//  u8g2.drawStr(120, 25, "t");
+
+  getStrValue(buff, gps.speed.kmph());
+
+  u8g2.setFont(u8g2_font_logisoso22_tf);
+  u8g2.setFontPosTop();
+  u8g2.drawStr(1, 10, buff);
+
+  getStrValue(buff, gps.altitude.meters(), 4, 1);
+  u8g2.drawStr(66, 10, buff);
+  
+}
+
+void drawMaxMode() {
+  char buff[8];
+
+  u8g2.drawStr(0, 10, "Cur: ");
+  getStrValue(buff, gps.speed.kmph());
+  u8g2.drawStr(22, 10, buff);
+  u8g2.drawStr(44, 10, "kmph");
+
+  getStrValue(buff, gps.location.lat(), 8, 4);
+  u8g2.drawStr(0, 17, "LAT: ");
+  u8g2.drawStr(22, 17, buff);
+
+  getStrValue(buff, gps.location.lng(), 8, 4);
+  u8g2.drawStr(0, 24, "LNG: ");
+  u8g2.drawStr(22, 24, buff);
+
+  getStrValue(buff, maxSpeed);
+  u8g2.drawStr(66, 10, "MAX: ");
+  u8g2.drawStr(88, 10, buff);
+  u8g2.drawStr(109, 10, "kmph");
+
+  getStrValue(buff, gps.altitude.meters(), 6, 1);
+  u8g2.drawStr(66, 17, "ALT: ");
+  u8g2.drawStr(80, 17, buff);
+}
+
+void drawHeader(char* curTime) {
+  char buff[8];
+  u8g2.drawStr(0, 0, curTime);
+  u8g2.drawStr(48, 0, "JI-HOON");
+  
+  getStrValue(buff, gps.satellites.value());
+  u8g2.drawUTF8(109, 0, buff);
+}
+
+void drawAntenna() {
+  if( gps.satellites.value() > 4 ) {
+    u8g2.setFont(u8g2_font_open_iconic_all_1x_t);
+    u8g2.setFontPosTop();
+    u8g2.drawUTF8(120, 0, "\u00f8");
+  }
 }
 
 int getLocalHour(int org, int gmt) {
@@ -132,7 +183,8 @@ void setMaxSpeed() {
 void sendSmartPortData() {
     frGps.setData(gps.location.lat(), gps.location.lng(),   // Latitude and longitude in degrees decimal (positive for N/E, negative for S/W)
             gps.altitude.meters(),                        // Altitude in m (can be nevative)
-            gps.speed.mps(),                              // Speed in m/s
+//            gps.speed.mps(),                              // Speed in m/s
+                        17,                              // Speed in m/s
             gps.course.deg(),                             // Course over ground in degrees
             gps.date.year(), gps.date.month(), gps.date.day(),             // Date (year - 2000, month, day)
             gps.time.hour(), gps.time.minute(), gps.time.second());        // Time (hour, minute, second) - will be affected by timezone setings in your radio
