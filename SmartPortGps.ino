@@ -1,6 +1,7 @@
 #include <U8g2lib.h>
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
+#include "SmartPortGps.h"
 
 #include "FrSkySportSensor.h"
 #include "FrSkySportSensorGps.h"
@@ -27,7 +28,9 @@ FrSkySportTelemetry telemetry;                         // Create Variometer tele
 char recvGpsSignal = 0;
 long prevMillis = 0;
 int maxSpeed = 0;
-boolean isMaxMode = true;
+
+
+int curMode = MODE_MAX;
 
 
 void setup(void) {
@@ -50,7 +53,7 @@ void setup(void) {
 void loop(void) {
 
   if(digitalRead(0) == 0) { 
-    isMaxMode = !isMaxMode;
+    nextMode();
     delay(250);
   }
   
@@ -60,9 +63,6 @@ void loop(void) {
   u8g2.setFontPosTop();
 
   //u8g2_font_luBIS18_tf
-
-  u8g2.drawLine(0, 8, 128, 8);
-  u8g2.drawLine(64, 8, 64, 48);
 
   char curTime[10];
   getCurTime(curTime);
@@ -76,8 +76,18 @@ void loop(void) {
   
   do {
     drawHeader(curTime);
-    if(isMaxMode) drawMaxMode();
-    else          drawHudMode();
+    if(curMode == MODE_MAX) {
+      drawCenterLine();
+      drawMaxMode();
+    }
+    else if(curMode == MODE_INFO) {
+      drawCenterLine();
+      drawInfoMode();
+    }
+    else if(curMode == MODE_ALT) {
+      drawMoreRightLine();
+      drawAltMode();
+    }
     drawAntenna();
   } while( u8g2.nextPage() );
 
@@ -86,12 +96,29 @@ void loop(void) {
   sendSmartPortData();
 }
 
-void drawHudMode() {
+void drawCenterLine() {
+  u8g2.drawLine(0, 8, 128, 8);
+  u8g2.drawLine(64, 8, 64, 48);
+}
+
+void drawMoreRightLine() {
+  u8g2.drawLine(0, 8, 128, 8);
+  u8g2.drawLine(58, 8, 58, 48);
+}
+
+void nextMode() {
+  if( curMode == MODE_MAX) curMode = MODE_ALT;
+  else if( curMode == MODE_ALT ) curMode = MODE_INFO;
+  else if( curMode == MODE_INFO ) curMode = MODE_MAX;
+  
+}
+
+void drawAltMode() {
   char buff[8];
   
-  u8g2.drawStr(56, 9, "k");
-  u8g2.drawStr(56, 17, "/");
-  u8g2.drawStr(56, 25, "h");
+  u8g2.drawStr(51, 9, "k");
+  u8g2.drawStr(51, 17, "/");
+  u8g2.drawStr(51, 25, "h");
 
 //  u8g2.drawStr(120, 9, "a");
 //  u8g2.drawStr(120, 17, "l");
@@ -104,11 +131,32 @@ void drawHudMode() {
   u8g2.drawStr(1, 10, buff);
 
   getStrValue(buff, gps.altitude.meters(), 4, 1);
-  u8g2.drawStr(66, 10, buff);
-  
+  u8g2.drawStr(60, 10, buff);
 }
 
+
 void drawMaxMode() {
+  char buff[8];
+  
+  u8g2.drawStr(56, 9, "k");
+  u8g2.drawStr(56, 17, "/");
+  u8g2.drawStr(56, 25, "h");
+
+  u8g2.drawStr(120, 9, "k");
+  u8g2.drawStr(120, 17, "/");
+  u8g2.drawStr(120, 25, "h");
+
+  getStrValue(buff, gps.speed.kmph());
+
+  u8g2.setFont(u8g2_font_logisoso22_tf);
+  u8g2.setFontPosTop();
+  u8g2.drawStr(1, 10, buff);
+
+  getStrValue(buff, maxSpeed);
+  u8g2.drawStr(66, 10, buff);
+}
+
+void drawInfoMode() {
   char buff[8];
 
   u8g2.drawStr(0, 10, "Cur: ");
