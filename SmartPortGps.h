@@ -5,4 +5,6 @@
 #define MODE_ALT    1
 #define MODE_INFO   2
 
+#define TTGO_NODEMCU
+
 #endif

@@ -1,6 +1,8 @@
 #include <U8g2lib.h>
 #include <TinyGPS++.h>
 #include <SoftwareSerial.h>
+#include <EEPROM.h>
+
 #include "SmartPortGps.h"
 
 #include "FrSkySportSensor.h"
@@ -8,17 +10,32 @@
 #include "FrSkySportSingleWireSerial.h"
 #include "FrSkySportTelemetry.h"
 
+
 TinyGPSPlus gps;
 
 static const int RXPin = 13, TXPin = 15;
 static const uint32_t GPSBaud = 9600;
 
+#define PRG_PIN 0
+#define MODE_ADDR 0
+
+#ifdef TTGO_NODEMCU
+  #define OLED_SDA  2
+  #define OLED_SCL 14
+  #define OLED_RST  4
+
+  U8G2_SSD1306_128X32_UNIVISION_F_SW_I2C u8g2(U8G2_R0, OLED_SCL, OLED_SDA , OLED_RST);
+#else
 //U8g2 Contructor
 U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C u8g2(U8G2_R0, /* reset=*/ 16, /* clock=*/ 5, /* data=*/ 4);
+#endif
+
 
 u8g2_uint_t offset;     // current offset for the scrolling text
 u8g2_uint_t width;      // pixel width of the scrolling text (must be lesser than 128 unless U8G2_16BIT is defined
-const char *text = "Ddori Gps "; // scroll this text from right to left
+// const char *text = "JONGSUNG";
+// const char *text = "SOONMIN";
+const char *text = "YOUNGCHUL";
 
 SoftwareSerial ss(RXPin, TXPin);
 
@@ -30,7 +47,30 @@ long prevMillis = 0;
 int maxSpeed = 0;
 
 
-int curMode = MODE_MAX;
+uint8_t curMode = MODE_MAX;
+
+void setMode() {
+  // curMode = EEPROM.read(MODE_ADDR);
+  EEPROM.begin(512);
+  EEPROM.get(MODE_ADDR, curMode);
+  Serial.print("PREV : ");
+  Serial.print(curMode, DEC);
+  Serial.print(", ");
+
+  if( curMode == MODE_MAX) curMode = MODE_ALT;
+  else if( curMode == MODE_ALT ) curMode = MODE_INFO;
+  else if( curMode == MODE_INFO ) curMode = MODE_MAX;
+  else curMode = MODE_MAX;
+
+  Serial.print("CUR : ");
+  Serial.println(curMode, DEC);
+  
+  // EEPROM.write(MODE_ADDR, curMode);
+  EEPROM.put(MODE_ADDR, curMode);
+  EEPROM.commit();
+  EEPROM.end();
+  
+}
 
 
 void setup(void) {
@@ -39,23 +79,23 @@ void setup(void) {
 //  u8g2.setFont(u8g2_font_logisoso32_tf); // set the target font to calculate the pixel width
 //  width = u8g2.getUTF8Width(text);    // calculate the pixel width of the text
 
-  u8g2.setFontMode(0);    // enable transparent mode, which is faster
+  // u8g2.setFontMode(0);    // enable transparent mode, which is faster
+  u8g2.setFontMode(1);    // enable transparent mode, which is faster
 
-  pinMode(0, INPUT);
+//  pinMode(0, INPUT);
+  // pinMode(PRG_PIN, INPUT_PULLUP);
+  
 
   Serial.begin(57600);
   ss.begin(GPSBaud);
 
-  telemetry.begin(FrSkySportSingleWireSerial::SOFT_SERIAL_PIN_4, &frGps);
+  telemetry.begin(FrSkySportSingleWireSerial::SOFT_SERIAL_PIN_12, &frGps);
+
+  setMode();
 
 }
 
 void loop(void) {
-
-  if(digitalRead(0) == 0) { 
-    nextMode();
-    delay(250);
-  }
   
   u8g2.clearBuffer();
   u8g2.firstPage();
@@ -185,7 +225,7 @@ void drawInfoMode() {
 void drawHeader(char* curTime) {
   char buff[8];
   u8g2.drawStr(0, 0, curTime);
-  u8g2.drawStr(48, 0, "JI-HOON");
+  u8g2.drawStr(48, 0, text);
   
   getStrValue(buff, gps.satellites.value());
   u8g2.drawUTF8(109, 0, buff);
@@ -238,122 +278,4 @@ void sendSmartPortData() {
             gps.time.hour(), gps.time.minute(), gps.time.second());        // Time (hour, minute, second) - will be affected by timezone setings in your radio
 
     telemetry.send();
-}
-
-//void loop(void) {
-//  
-//  u8g2.firstPage();
-//  u8g2.setFont(u8g2_font_micro_tr);
-//
-//  while (ss.available() > 0) {
-//    if (gps.encode(ss.read())) {
-//      recvGpsSignal = 1;
-//      prevMillis = millis();
-//    // displayInfo();
-//    displayGpsSpeed();
-//
-//    // Set GPS data
-//    frGps.setData(gps.location.lat(), gps.location.lng(),   // Latitude and longitude in degrees decimal (positive for N/E, negative for S/W)
-//              gps.altitude.meters(),                        // Altitude in m (can be nevative)
-//              gps.speed.mps(),                              // Speed in m/s
-//              gps.course.deg(),                             // Course over ground in degrees
-//              gps.date.year(), gps.date.month(), gps.date.day(),             // Date (year - 2000, month, day)
-//              gps.time.hour(), gps.time.minute(), gps.time.second());        // Time (hour, minute, second) - will be affected by timezone setings in your radio
-//
-//    telemetry.send();
-//      
-//    }
-//  }
-//  gpsTimeoutCheck();
-//  
-//
-//
-//  if (millis() > 5000 && gps.charsProcessed() < 10)
-//  {
-//    Serial.println(F("No GPS detected: check wiring."));
-//    do{
-//      u8g2.setCursor(0, 27);
-//      u8g2.print("No GPS detected: check wiring.");
-//    } while( u8g2.nextPage() );
-//    while(true);
-//  } else {
-//    if(recvGpsSignal == 0) {
-//      do {
-//        u8g2.setCursor(0, 10);
-//        u8g2.print("Waiting GPS.....");
-//      } while( u8g2.nextPage());
-//    }
-//  }
-//}
-
-void displayGpsSpeed() {
-  if(!gps.location.isValid()) return;
-
-  do {
-    u8g2.setCursor(0, 21);
-    u8g2.print("gps ok...");
-    u8g2.setCursor(70, 21);
-    u8g2.print(gps.speed.kmph());
-  } while( u8g2.nextPage() );
-}
-
-void gpsTimeoutCheck() {
-  if(recvGpsSignal == 0) return;
-  long now = millis();
-
-  if( (now - prevMillis) > 30000) {
-    recvGpsSignal = 0;
-  }
-}
-
-
-void displayInfo()
-{
-  Serial.print(F("Location: ")); 
-  if (gps.location.isValid())
-  {
-    Serial.print(gps.location.lat(), 6);
-    Serial.print(F(","));
-    Serial.print(gps.location.lng(), 6);
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.print(F("  Date/Time: "));
-  if (gps.date.isValid())
-  {
-    Serial.print(gps.date.month());
-    Serial.print(F("/"));
-    Serial.print(gps.date.day());
-    Serial.print(F("/"));
-    Serial.print(gps.date.year());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.print(F(" "));
-  if (gps.time.isValid())
-  {
-    if (gps.time.hour() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.hour());
-    Serial.print(F(":"));
-    if (gps.time.minute() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.minute());
-    Serial.print(F(":"));
-    if (gps.time.second() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.second());
-    Serial.print(F("."));
-    if (gps.time.centisecond() < 10) Serial.print(F("0"));
-    Serial.print(gps.time.centisecond());
-  }
-  else
-  {
-    Serial.print(F("INVALID"));
-  }
-
-  Serial.println();
 }
