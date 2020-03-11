@@ -5,16 +5,18 @@
 
 #include "SmartPortGps.h"
 
-#include "FrSkySportSensor.h"
-#include "FrSkySportSensorGps.h"
-#include "FrSkySportSingleWireSerial.h"
-#include "FrSkySportTelemetry.h"
+#include <FrSkySportSensor.h>
+#include <FrSkySportSensorGps.h>
+#include <FrSkySportSingleWireSerial.h>
+#include <FrSkySportTelemetry.h>
 
 
 TinyGPSPlus gps;
 
 static const int RXPin = 13, TXPin = 15;
 static const uint32_t GPSBaud = 9600;
+
+// #define POLLING_ENABLED
 
 #define PRG_PIN 0
 #define MODE_ADDR 0
@@ -35,7 +37,7 @@ u8g2_uint_t offset;     // current offset for the scrolling text
 u8g2_uint_t width;      // pixel width of the scrolling text (must be lesser than 128 unless U8G2_16BIT is defined
 // const char *text = "JONGSUNG";
 // const char *text = "SOONMIN";
-const char *text = "YOUNGCHUL";
+const char *text = "GTX";
 
 SoftwareSerial ss(RXPin, TXPin);
 
@@ -53,19 +55,12 @@ void setMode() {
   // curMode = EEPROM.read(MODE_ADDR);
   EEPROM.begin(512);
   EEPROM.get(MODE_ADDR, curMode);
-  Serial.print("PREV : ");
-  Serial.print(curMode, DEC);
-  Serial.print(", ");
 
   if( curMode == MODE_MAX) curMode = MODE_ALT;
   else if( curMode == MODE_ALT ) curMode = MODE_INFO;
   else if( curMode == MODE_INFO ) curMode = MODE_MAX;
   else curMode = MODE_MAX;
 
-  Serial.print("CUR : ");
-  Serial.println(curMode, DEC);
-  
-  // EEPROM.write(MODE_ADDR, curMode);
   EEPROM.put(MODE_ADDR, curMode);
   EEPROM.commit();
   EEPROM.end();
@@ -76,23 +71,15 @@ void setMode() {
 void setup(void) {
   u8g2.begin();
 
-//  u8g2.setFont(u8g2_font_logisoso32_tf); // set the target font to calculate the pixel width
-//  width = u8g2.getUTF8Width(text);    // calculate the pixel width of the text
-
   // u8g2.setFontMode(0);    // enable transparent mode, which is faster
   u8g2.setFontMode(1);    // enable transparent mode, which is faster
-
-//  pinMode(0, INPUT);
-  // pinMode(PRG_PIN, INPUT_PULLUP);
-  
 
   Serial.begin(57600);
   ss.begin(GPSBaud);
 
-  telemetry.begin(FrSkySportSingleWireSerial::SOFT_SERIAL_PIN_12, &frGps);
+  telemetry.begin(FrSkySportSingleWireSerial::SOFT_SERIAL_PIN_5, &frGps);
 
   setMode();
-
 }
 
 void loop(void) {
@@ -102,8 +89,6 @@ void loop(void) {
   u8g2.setFont(u8g2_font_5x7_tf);
   u8g2.setFontPosTop();
 
-  //u8g2_font_luBIS18_tf
-
   char curTime[10];
   getCurTime(curTime);
 
@@ -111,6 +96,8 @@ void loop(void) {
     if (gps.encode(ss.read())) {
       u8g2.drawUTF8(103, 0, "r");
       setMaxSpeed();
+
+      sendSmartPortData();
     }
   }
   
@@ -129,11 +116,8 @@ void loop(void) {
       drawAltMode();
     }
     drawAntenna();
+    sendSmartPortData();
   } while( u8g2.nextPage() );
-
-  
-
-  sendSmartPortData();
 }
 
 void drawCenterLine() {
@@ -271,8 +255,8 @@ void setMaxSpeed() {
 void sendSmartPortData() {
     frGps.setData(gps.location.lat(), gps.location.lng(),   // Latitude and longitude in degrees decimal (positive for N/E, negative for S/W)
             gps.altitude.meters(),                        // Altitude in m (can be nevative)
-//            gps.speed.mps(),                              // Speed in m/s
-                        17,                              // Speed in m/s
+           gps.speed.mps(),                              // Speed in m/s
+                        // 17,                              // Speed in m/s
             gps.course.deg(),                             // Course over ground in degrees
             gps.date.year(), gps.date.month(), gps.date.day(),             // Date (year - 2000, month, day)
             gps.time.hour(), gps.time.minute(), gps.time.second());        // Time (hour, minute, second) - will be affected by timezone setings in your radio
